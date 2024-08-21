@@ -9,7 +9,7 @@ struct AppStateWithCounter {
 async fn index(data: web::Data<AppStateWithCounter>) -> String {
     let mut counter = data.counter.lock().unwrap(); // <- get counter's MutexGuard
 
-    let r=format!("Tere tulemast!\nKülastaja number: {counter}"); // <- response with count
+    let r=format!("Täiesti suvaline!\nKülastaja number: {counter}"); // <- response with count
     *counter += 1; // <- access counter inside MutexGuard
     r
 }

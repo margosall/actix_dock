@@ -1,34 +1,34 @@
-use actix_web::{web, App, HttpServer};
+use actix_web::{web, App, HttpServer, HttpResponse};
 
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 struct AppStateWithCounter {
-    counter: Mutex<u32>, // <- Mutex is necessary to mutate safely across threads
+    counter: AtomicU32, // <- Mutex is necessary to mutate safely across threads
 }
 
-async fn index(data: web::Data<AppStateWithCounter>) -> String {
-    let mut counter = data.counter.lock().unwrap(); // <- get counter's MutexGuard
+async fn index(data: web::Data<AppStateWithCounter>) -> actix_web::Result<HttpResponse>  {
+    let current = data.counter.fetch_add(1, Ordering::Relaxed);
 
-    let r=format!("Täiesti suvaline!\nKülastaja number: {counter}"); // <- response with count
-    *counter += 1; // <- access counter inside MutexGuard
-    r
+    Ok(HttpResponse::Ok()
+        .content_type("text/plain; charset=utf-8")
+        .body(format!("Täiesti suvaline!\nKülastaja number: {}", current + 1)))
 }
-
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     // Note: web::Data created _outside_ HttpServer::new closure
     let counter = web::Data::new(AppStateWithCounter {
-        counter: Mutex::new(0),
+        counter: AtomicU32::new(0),
     });
-    
+
     println!("Server started!");
     HttpServer::new(move || {
         App::new()
-        .app_data(counter.clone()) // <- register the created data
-        .route("/", web::get().to(index))
-})
+            .app_data(counter.clone())
+            .route("/", web::get().to(index))
+    })
     .bind(("0.0.0.0", 8080))?
+    .workers(4) // <- Explicit worker count
     .run()
     .await
 }
